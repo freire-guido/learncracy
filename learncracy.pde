@@ -1,26 +1,57 @@
+ArrayList<NLayer> candidate1;
+ArrayList<NLayer> candidate2;
+ArrayList<Voter> voters;
+boolean newSim;
+
 void setup() {
   size(1024, 768);
   textAlign(CENTER);
+  
+  //Generate a random input array
+  voters = new ArrayList<Voter>();
+  for(int i=0; i<20; i++){
+    float[] ran1 = {random(10), random(10), random(10)};
+    voters.add(new Voter(ran1));
+  }  
 }
 
 void draw() {
-  background(0); 
-  //Generate a random input array
-  float[] ran = {random(1), random(1), random(1), random(1)};
-  //Define neural network shape
-  NLayer layer1 = new NLayer(ran, 4, 1);
-  NLayer layer2 = new NLayer(layer1.outputs, 8, 2);
-  NLayer layer3 = new NLayer(layer2.outputs, 8, 3);
-  NLayer layer4 = new NLayer(layer3.outputs, 2, 4);
-  
-  layer1.forward();
-  layer2.forward();
-  layer3.forward();
-  layer4.forward();
-  layer1.display();
-  layer2.display();
-  layer3.display();
-  layer4.display();
+  int tally = 0;
+  if(newSim){
+    background(0);
+    //Create neural networks
+    float[] ran = {random(1), random(1), random(1), random(1)};
+    candidate1 = new ArrayList<NLayer>();
+    candidate2 = new ArrayList<NLayer>();
+    candidate1.add(new NLayer(ran, 4, 1));
+    candidate1.add(new NLayer(candidate1.get(0).outputs, 8, 2));
+    candidate1.add(new NLayer(candidate1.get(1).outputs, 8, 3));
+    candidate1.add(new NLayer(candidate1.get(2).outputs, 3, 4));
+    candidate2.add(new NLayer(ran, 4, 1));
+    candidate2.add(new NLayer(candidate1.get(0).outputs, 8, 2));
+    candidate2.add(new NLayer(candidate1.get(1).outputs, 8, 3));
+    candidate2.add(new NLayer(candidate1.get(2).outputs, 3, 4));
+    for(int i=0; i<candidate1.size(); i++){
+      candidate1.get(i).forward();
+      candidate2.get(i).forward();
+      candidate1.get(i).display(width/2, 0, 0);
+      candidate2.get(i).display(0, 0, 1);
+    }
+    for(int i=0; i<voters.size(); i++){
+      voters.get(i).vote(candidate1.get(3).outputs, candidate2.get(3).outputs);
+      tally += voters.get(i).output;
+      voters.get(i).display(width/(voters.size()+1)*(i+1), -10);
+    }
+    if(tally > voters.size()/2){
+      textSize(20);
+      text("Winner: candidate1", width/2, height*2/3);
+    }
+    else{
+      textSize(20);
+      text("Winner: candidate2", width/2, height*2/3);
+    }
+   newSim = false; 
+  }
 }
 
 class NLayer {
@@ -59,27 +90,88 @@ class NLayer {
     }
   }
 
-  void display() {
-    int nSize = 50;
+  void display(int pX, int pY, int cN) {
+    int oSize = 42;
     for (int o=0; o<outputs.length; o++) {
-      int nX = width/8 + pos*nSize*3;
-      int nY = (o+1)*(height/(outputs.length+1));      
+      int oX = oSize + pos*oSize*2 + pX;
+      int oY = (o+1)*(400/(outputs.length+1)) + pY;   
       //Draw each synapse stroke weight = synapse weight, unless the layer is the first one
       if(pos > 1){
         for (int i=0; i<inputs.length; i++) {
-          int iX = width/8 + (pos-1)*nSize*3;
-          int iY = (i+1)*(height/(inputs.length+1));
+          int iX = oSize + (pos-1)*oSize*2 + pX;
+          int iY = (i+1)*(400/(inputs.length+1)) + pY;
           strokeWeight(weights.get(o)[i]);
-          line(iX, iY, nX, nY);
+          line(iX, iY, oX, oY);
         }
       }
       //Draw each neuron as a circle, with its output in the middle
       strokeWeight(2);
-      fill(0, 102, 153);
+      if(cN==0){
+        fill(0, 102, 153); 
+      }
+      else{
+        fill(153, 102, 0);
+      }
       stroke(255);
-      circle(nX, nY, nSize);
+      circle(oX, oY, oSize);
       fill(255);
-      text(outputs[o], nX, nY+4);
+      textSize(14);
+      text(outputs[o], oX, oY+4);
     }
+  }
+}
+
+class Voter {
+  ArrayList<float[]> inputs = new ArrayList<float[]>();
+  int output;
+  float[] params;
+  Voter(float[] parameters){
+    params = parameters;
+  }
+  
+  void vote(float[] input1, float[] input2){
+    float[] distance = new float[2];
+    inputs.add(input1);
+    inputs.add(input2);
+    //Calculate distance to input1
+    for(int i=0; i<input1.length; i++){
+      distance[0] += sq(params[i] - input1[i]);
+    }
+    distance[0] = sqrt(distance[0]);
+    //Calculate distance to input2
+    for(int i=0; i<input2.length; i++){
+      distance[1] += sq(params[i] - input2[i]);
+    }
+    distance[1] = sqrt(distance[1]);
+    if(distance[1] > distance[0]){
+      output = 0;
+    }
+    if(distance[0] > distance[1]){
+      output = 1;
+    }
+  }
+  
+  void display(int pX, int pY){
+    int oSize = 36;
+    int oX = pX;
+    int oY = width*3/4 - oSize/2 + pY;    
+    //Draw each voter as a circle, with its vote in the middle
+    strokeWeight(2);
+    if(output==0){
+      fill(0, 102, 153);
+    }
+    else{
+      fill(153, 102, 0);
+    }
+    stroke(255);
+    circle(oX, oY, oSize);
+    fill(255);
+    textSize(14);
+  }
+}
+
+void keyPressed(){
+  if(key==' '){
+    newSim = true;
   }
 }
