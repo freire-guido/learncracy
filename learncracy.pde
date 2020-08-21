@@ -3,7 +3,10 @@ ArrayList<NLayer>candidate1 = new ArrayList<NLayer>();
 ArrayList<NLayer>candidate2 = new ArrayList<NLayer>();
 ArrayList<Voter> voters;
 boolean newSim;
+int iterations;
 float[] issues;
+int results;
+float[] loss = {0.5};
 
 void setup() {
   background(0);
@@ -11,8 +14,8 @@ void setup() {
   textAlign(CENTER);
   //Generate random voters
   voters = new ArrayList<Voter>();
-  for (int i=0; i<3; i++) {
-    float[] ran1 = {random(1), random(1), random(1)};
+  for (int i=0; i<20; i++) {
+    float[] ran1 = {random(1), random(1), random(1), random(1), random(1)};
     voters.add(new Voter(ran1));
     if (i==0) {
       issues = ran1;
@@ -21,23 +24,24 @@ void setup() {
     }
   }
   candidate1.add(new NLayer(issues, voters.size()*voters.get(0).params.length, 1));
-  candidate1.add(new NLayer(candidate1.get(0).outputs, 5, 2));
-  candidate1.add(new NLayer(candidate1.get(1).outputs, 4, 3));
+  candidate1.add(new NLayer(candidate1.get(0).outputs, 8, 2));
+  candidate1.add(new NLayer(candidate1.get(1).outputs, 8, 3));
   candidate1.add(new NLayer(candidate1.get(2).outputs, voters.get(0).params.length, 4));
   candidate2.add(new NLayer(issues, voters.size()*voters.get(0).params.length, 1));
-  candidate2.add(new NLayer(candidate1.get(0).outputs, 5, 2));
-  candidate2.add(new NLayer(candidate1.get(1).outputs, 4, 3));
+  candidate2.add(new NLayer(candidate1.get(0).outputs, 8, 2));
+  candidate2.add(new NLayer(candidate1.get(1).outputs, 8, 3));
   candidate2.add(new NLayer(candidate1.get(2).outputs, voters.get(0).params.length, 4));
 }
 
 void draw() {
   int tally = 0;
-  float[] target = {20, 0, 0};
   if (newSim) {
+    iterations++;
+    float[] target = {0.2, 0.2, 0.2, 0.2, 0.2};
     background(0);
     voters = new ArrayList<Voter>();
-    for (int i=0; i<3; i++) {
-      float[] ran1 = {random(1), random(1), random(1)};
+    for (int i=0; i<20; i++) {
+      float[] ran1 = {random(1), random(1), random(1), random(1), random(1)};
       voters.add(new Voter(ran1));
       if (i==0) {
         issues = ran1;
@@ -54,6 +58,8 @@ void draw() {
         candidate1.get(i).forward(candidate1.get(i-1).outputs);
         candidate2.get(i).forward(candidate2.get(i-1).outputs);
       }
+    }
+    for (int i=candidate1.size()-1; i>=0; i--) {
       //Draw networks
       candidate1.get(i).display(0, 0, 0);
       candidate2.get(i).display(width/2, 0, 1);
@@ -62,7 +68,7 @@ void draw() {
       //Draw voters
       voters.get(i).vote(candidate1.get(3).outputs, candidate2.get(3).outputs);
       tally += voters.get(i).output;
-      voters.get(i).display(width/(voters.size()+1)*(i+1), -10);
+      voters.get(i).display(width/(voters.size()+1)*(i+1), -150);
     }
     //Display winner
     if (tally > voters.size()/2) {
@@ -71,9 +77,11 @@ void draw() {
     } else {
       textSize(20);
       text("Winner: candidate1", width/2, height*2/3);
+      results++;
     }
+    graph(results, iterations);
     backPropagate(candidate1, target, 4);
-    backPropagate(candidate2, target, 4);
+    //backPropagate(candidate2, target, 4);
     newSim = false;
   }
 }
@@ -113,6 +121,7 @@ class NLayer {
     } else {
       inputs = input;
       outputs = new float[outputs.length];
+      float sum = 0;
       for (int o=0; o<outputs.length; o++) {
         for (int i=0; i<inputs.length; i++) {
           //Rectify inputs (ReLU)
@@ -123,6 +132,11 @@ class NLayer {
           outputs[o] += inputs[i] * weights.get(o)[i];
         }
         outputs[o] += biases[o];
+        sum += outputs[o];
+      }
+      for (int o=0; o<outputs.length; o++) {
+        //Map to a value between 0 and 1
+        outputs[o] = outputs[o]/sum;
       }
     }
   }
@@ -254,23 +268,25 @@ void back(ArrayList<NLayer> network, int n, int size, float delta) {
     if (layer != 1) {
       for (int w=0; w<wSize; w++) {
         if (network.get(layer).weights.get(n)[w] > MSE) {
-          println("        layer:", layer, "neuron:", n, "weight:", w);
-          back(network, w, layer, delta);
-        }
-      }
-    } else {
-      for (int w=0; w<wSize; w++) {
-        if (network.get(layer).weights.get(n)[w] > MSE) {
-          println("layer:", layer, "neuron:", n, "weight:", w);
-          println(network.get(layer-1).outputs[w]/delta);
+          //println("layer:", layer, "neuron:", n, "weight:", w);
           network.get(layer).weights.get(n)[w] = delta/network.get(layer-1).outputs[w];
+          //print(" ", delta/network.get(layer-1).outputs[w]);
+          back(network, w, layer, delta);
         }
       }
     }
   }
 }
 
-void encode() {
+void graph(int pos, int total) {
+  loss = append(loss, float(pos)/float(total));
+  for (int i=1; i<loss.length; i++) {
+    line(i+4, -loss[i-1]*10+height, i+5, -loss[i]*100+height);
+  }
+  stroke(255, 0, 0);
+  line(0, height-50, width, height-50);
+  text(loss[loss.length-1], loss.length+4, -loss[loss.length-1]*100+height);
+  stroke(155);
 }
 
 void keyPressed() {
