@@ -214,7 +214,6 @@ class Voter {
       }
       distance[i] = sqrt(distance[i]);
     }
-    distance[1] = sqrt(distance[1]);
     for (int i=0; i<distance.length; i++) {
       if (distance[i] == max(distance)) {
         output = i;
