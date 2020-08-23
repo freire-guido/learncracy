@@ -5,11 +5,11 @@ ArrayList<NLayer>candidate2 = new ArrayList<NLayer>();
 ArrayList<NLayer>candidate3 = new ArrayList<NLayer>();
 ArrayList<ArrayList<NLayer>> population = new ArrayList<ArrayList<NLayer>>();
 ArrayList<Voter> voters;
+float[] loss = {0.5};
 boolean newSim;
 int iterations;
 float[] issues;
-int results;
-float[] loss = {0.5};
+int[] tally;
 
 void setup() {
   background(0);
@@ -17,7 +17,7 @@ void setup() {
   textAlign(CENTER);
   //Generate random voters
   voters = new ArrayList<Voter>();
-  for (int i=0; i<5; i++) {
+  for (int i=0; i<8; i++) {
     float[] ran1 = {random(1), random(1), random(1)};
     voters.add(new Voter(ran1));
     if (i==0) {
@@ -28,23 +28,23 @@ void setup() {
   }
   //Shape neural networks
   candidate0.add(new NLayer(issues, voters.size()*voters.get(0).params.length, 1));
-  candidate0.add(new NLayer(candidate0.get(0).outputs, 5, 2));
-  candidate0.add(new NLayer(candidate0.get(1).outputs, 5, 3));
+  candidate0.add(new NLayer(candidate0.get(0).outputs, 4, 2));
+  candidate0.add(new NLayer(candidate0.get(1).outputs, 4, 3));
   candidate0.add(new NLayer(candidate0.get(2).outputs, voters.get(0).params.length, 4));
 
   candidate1.add(new NLayer(issues, voters.size()*voters.get(0).params.length, 1));
-  candidate1.add(new NLayer(candidate1.get(0).outputs, 5, 2));
-  candidate1.add(new NLayer(candidate1.get(1).outputs, 5, 3));
+  candidate1.add(new NLayer(candidate1.get(0).outputs, 4, 2));
+  candidate1.add(new NLayer(candidate1.get(1).outputs, 4, 3));
   candidate1.add(new NLayer(candidate1.get(2).outputs, voters.get(0).params.length, 4));
 
   candidate2.add(new NLayer(issues, voters.size()*voters.get(0).params.length, 1));
-  candidate2.add(new NLayer(candidate2.get(0).outputs, 5, 2));
-  candidate2.add(new NLayer(candidate2.get(1).outputs, 5, 3));
+  candidate2.add(new NLayer(candidate2.get(0).outputs, 4, 2));
+  candidate2.add(new NLayer(candidate2.get(1).outputs, 4, 3));
   candidate2.add(new NLayer(candidate2.get(2).outputs, voters.get(0).params.length, 4));
 
   candidate3.add(new NLayer(issues, voters.size()*voters.get(0).params.length, 1));
-  candidate3.add(new NLayer(candidate3.get(0).outputs, 5, 2));
-  candidate3.add(new NLayer(candidate3.get(1).outputs, 5, 3));
+  candidate3.add(new NLayer(candidate3.get(0).outputs, 4, 2));
+  candidate3.add(new NLayer(candidate3.get(1).outputs, 4, 3));
   candidate3.add(new NLayer(candidate3.get(2).outputs, voters.get(0).params.length, 4));
 
   population.add(candidate0);
@@ -59,7 +59,7 @@ void draw() {
     iterations++;
     //Generate a new random set of voters
     voters = new ArrayList<Voter>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<8; i++) {
       float[] ran1 = {random(1), random(1), random(1)};
       voters.add(new Voter(ran1));
       if (i==0) {
@@ -71,15 +71,16 @@ void draw() {
     //Forward networks
     for (int i=0; i<population.size(); i++) {
       population.get(i).get(0).forward(issues);
-      population.get(i).get(0).display(0, 0, 0);
       for (int l=1; l<population.get(i).size(); l++) {
         population.get(i).get(l).forward(population.get(i).get(l-1).outputs);
       }
     }
-    //Run votes
+    //Run and count votes
+    tally = new int[population.size()];
     for (int i=0; i<voters.size(); i++) {
       voters.get(i).vote(population);
-      voters.get(i).display(width*(i+1)/(voters.size()*4/3 ), -600);
+      voters.get(i).display(width*(i+1)/(voters.size()*4/3), -600);
+      tally[voters.get(i).output]++;
     }
     //Draw networks
     for (int i=candidate0.size()-1; i>=0; i--) {
@@ -88,7 +89,7 @@ void draw() {
       candidate2.get(i).display(width/population.size(), 10, 2);
       candidate3.get(i).display(width/population.size(), 10, 3);
     }
-    graph(results, iterations);
+    evolve(population, tally);
     newSim = false;
   }
 }
@@ -236,7 +237,33 @@ class Voter {
   }
 }
 
-void evolve(ArrayList<ArrayList<NLayer>> population) {
+void evolve(ArrayList<ArrayList<NLayer>> population, int[] tally) {
+  ArrayList<NLayer> female = new ArrayList<NLayer>();
+  ArrayList<NLayer> male = new ArrayList<NLayer>();
+  int[] losers = {};
+  int temp = tally[0];
+  for (int i=0; i<tally.length; i++) {
+    println(i);
+    //Pick best network as a male network
+    if (tally[i]==max(tally)) {
+      println(i, "first");
+      male = population.get(i);
+    } else if (tally[i]>temp && tally[i]<max(tally)) {
+      println(i, "second");
+      female = population.get(i);
+    } else {
+      println(i, "loser");
+      losers = append(losers, i);
+    }
+    temp = tally[i];
+  }
+  //If there is no runner up, pick a random female network
+  if (female.size()==0) {
+    female = population.get(int(random(losers.length-1)));
+  }
+  for (int i=0; i<losers.length; i++) {
+    encode(crossOver(female, male), population.get(losers[i]));
+  }
 }
 
 //Generates a child genome out of two parent networks
@@ -248,6 +275,7 @@ ArrayList<ArrayList<float[]>> crossOver(ArrayList<NLayer> female, ArrayList<NLay
   float[] fem = {};
   float[] man = {};
   //Turn genome into float[]
+  println("Crossing");
   for (int layer=0; layer<maleGenome.size(); layer++) {
     for (int list=0; list<maleGenome.get(layer).size(); list++) {
       for (int element=0; element<maleGenome.get(layer).get(list).length; element++) {
@@ -256,25 +284,28 @@ ArrayList<ArrayList<float[]>> crossOver(ArrayList<NLayer> female, ArrayList<NLay
       }
     }
   }
-  int cutoff = int(random(fem.length));
-  child = concat(subset(fem, cutoff, fem.length-cutoff), subset(man, 0, cutoff-1));
+  int cutoff = int(random(2, fem.length));
+  child = concat(subset(fem, cutoff, fem.length-cutoff), subset(man, 0, cutoff));
   //Turn float[] into genome[]
-  for (int l=0; l<femGenome.size(); l++) {
-    ArrayList<float[]> layer = new ArrayList<float[]>();
-    for (int list=0; list<femGenome.get(l).size(); list++) {
+  int prevLength = 0;
+  for (int layer=0; layer<femGenome.size(); layer++) {
+    ArrayList<float[]> l = new ArrayList<float[]>();
+    for (int list=0; list<femGenome.get(layer).size(); list++) {
       float[] outputs = {};
-      for (int element=0; element<child.length; element++) {
-        append(outputs, child[0]);
+      for (int element=0; element<femGenome.get(layer).get(list).length; element++) {
+        outputs = append(outputs, child[element+prevLength]);
       }
-      layer.add(outputs);
+      prevLength += femGenome.get(layer).get(list).length;
+      l.add(outputs);
     }
-    childGenome.add(layer);
+    childGenome.add(l);
   }
   return childGenome;
 }
 
 //Returns weights and biases of a network as a genome
 ArrayList<ArrayList<float[]>> decode(ArrayList<NLayer> network) {
+  println("Decoding");
   ArrayList<ArrayList<float[]>> genomes = new ArrayList<ArrayList<float[]>>();
   for (int layer=1; layer<network.size(); layer++) {
     ArrayList<float[]> genome = new ArrayList<float[]>();
@@ -289,11 +320,12 @@ ArrayList<ArrayList<float[]>> decode(ArrayList<NLayer> network) {
 
 //Applies a genome to a network
 void encode(ArrayList<ArrayList<float[]>> genomes, ArrayList<NLayer> network) {
+  println("Encoding");
   for (int layer=1; layer<network.size(); layer++) {
     for (int g=0; g<genomes.get(layer-1).size()-1; g++) {
-      network.get(layer).weights.set(g, genomes.get(layer-1).get(g));
+      arrayCopy(genomes.get(layer-1).get(g), network.get(layer).weights.get(g));
     }
-    network.get(layer).biases = genomes.get(layer-1).get(genomes.size()-1);
+    network.get(layer).biases = genomes.get(layer-1).get(genomes.get(layer-1).size()-1);
   }
 }
 
